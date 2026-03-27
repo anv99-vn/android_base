@@ -12,13 +12,17 @@ config_version=5
 
 source_url="https://github.com/dao1701/android_base/releases/latest/download"
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="Base-game"
 run/main_scene="res://loader.tscn"
 config/project_settings_override="user://custom_settings.cfg"
 config/quit_on_go_back=false
-config/features=PackedStringArray("4.4", "Forward Plus")
+config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
