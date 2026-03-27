@@ -15,7 +15,7 @@ sky = SubResource("Sky_6fy3g")
 tonemap_mode = 2
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1k4gi"]
-albedo_color = Color(0.3529412, 0.6627451, 0.27058825, 1)
+albedo_color = Color(0.25987515, 0.5893251, 0.9202961, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_5q4o7"]
 material = SubResource("StandardMaterial3D_1k4gi")
