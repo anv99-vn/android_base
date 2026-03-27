@@ -21,7 +21,7 @@ on:
     branches: [ main ]
 
 env:
-  GODOT_VERSION: 4.4.1
+  GODOT_VERSION: 4.6.1
   ANDROID_KEYSTORE_DEBUG_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
   ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
   ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
