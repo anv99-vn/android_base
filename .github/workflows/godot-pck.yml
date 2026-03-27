@@ -5,6 +5,7 @@ env:
   ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
   ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
   WORKING_DIRECTORY: .
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
@@ -18,7 +19,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Read version number and version code
         run: |
           echo "VERSION_NAME=$(cat version | cut -f1 -d-)" >> $GITHUB_ENV
@@ -49,7 +50,7 @@ jobs:
       contents: write
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Download PCK artifact
         uses: actions/download-artifact@v4
