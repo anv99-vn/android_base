@@ -1,9 +1,12 @@
-name: Godot PCK Build
+name: Godot Build & Release
 
 env:
-  GODOT_VERSION: 4.4.1-stable
+  GODOT_VERSION: 4.6.1
   ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
   ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
+  ANDROID_KEYSTORE_DEBUG_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+  ANDROID_KEYSTORE_DEBUG_ALIAS: ${{ secrets.KEY_ALIAS }}
+  ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ secrets.KEY_PASSWORD }}
   WORKING_DIRECTORY: .
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -14,7 +17,22 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  check-apk-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      apk: ${{ steps.filter.outputs.apk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            apk:
+              - 'version'
+              - '.github/workflows/godot-pck.yml'
+              - 'export_presets.android.example'
+
+  build-pck:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,9 +45,9 @@ jobs:
 
       - name: Download Godot
         run: |
-          wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
-          unzip Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
-          chmod +x Godot_v${{ env.GODOT_VERSION }}_linux.x86_64
+          wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64.zip
+          unzip Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64.zip
+          chmod +x Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64
       - name: Create export_presets.cfg and inject values
         run: |
           cp $WORKING_DIRECTORY/export_presets.android.example $WORKING_DIRECTORY/export_presets.cfg
@@ -37,18 +55,74 @@ jobs:
           sed -i "s|VERSION_NAME|$VERSION_NAME|g" $WORKING_DIRECTORY/export_presets.cfg
       - name: Create PCK file
         run: |
-          ./Godot_v${{ env.GODOT_VERSION }}_linux.x86_64 --export-pack Android project.pck . --headless
+          ./Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64 --export-pack Android project.pck . --headless
       - name: Upload PCK file
         uses: actions/upload-artifact@v4
         with:
           name: project-pck
           path: project.pck
-  release:
-    needs: build
+
+  build-apk:
+    needs: [check-apk-changes]
+    if: needs.check-apk-changes.outputs.apk == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Read version number and version code
+        run: |
+          echo "VERSION_NAME=$(cat version | cut -f1 -d-)" >> $GITHUB_ENV
+          echo "VERSION_CODE=$(cat version | cut -f2 -d-)" >> $GITHUB_ENV
+
+      - name: Create keystores
+        run: |
+          echo $ANDROID_KEYSTORE_DEBUG_BASE64 | base64 --decode > debug.keystore
+
+      - name: Create export_presets.cfg and inject values
+        run: |
+          cp $WORKING_DIRECTORY/export_presets.android.example $WORKING_DIRECTORY/export_presets.cfg
+          sed -i "s|VERSION_CODE|$VERSION_CODE|g" $WORKING_DIRECTORY/export_presets.cfg
+          sed -i "s|VERSION_NAME|$VERSION_NAME|g" $WORKING_DIRECTORY/export_presets.cfg
+      
+      - name: Update project.godot with version
+        env:
+          ENCRYPTION_CONFIG: |
+            [encryption]
+            key="${{ env.ENCRYPTION_KEY }}"
+            iv="${{ env.ENCRYPTION_IV }}"
+            version="${{ env.VERSION_NAME }}"
+        run: |
+          echo "$ENCRYPTION_CONFIG" >> $WORKING_DIRECTORY/project.godot
+
+      - name: Create export_credentials.cfg and inject values
+        run: |
+          mkdir -p $WORKING_DIRECTORY/.godot/
+          cp $WORKING_DIRECTORY/export_credentials.android.example $WORKING_DIRECTORY/.godot/export_credentials.cfg
+          sed -i "s|KEYSTORE_DEBUG_PATH|$GITHUB_WORKSPACE/debug.keystore|g" $WORKING_DIRECTORY/.godot/export_credentials.cfg
+          sed -i "s|KEYSTORE_DEBUG_ALIAS|$ANDROID_KEYSTORE_DEBUG_ALIAS|g" $WORKING_DIRECTORY/.godot/export_credentials.cfg
+          sed -i "s|KEYSTORE_DEBUG_PASSWORD|$ANDROID_KEYSTORE_DEBUG_PASSWORD|g" $WORKING_DIRECTORY/.godot/export_credentials.cfg
+
+      - name: Godot Android export
+        uses: dulvui/godot-android-export@v4.0.4
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          working-directory: $WORKING_DIRECTORY
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-apk
+          path: OK.apk
+
+  release:
+    needs: [check-apk-changes, build-pck, build-apk]
+    if: always() && needs.build-pck.result == 'success' && (needs.build-apk.result == 'success' || needs.build-apk.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -57,19 +131,32 @@ jobs:
         with:
           name: project-pck
 
+      - name: Download APK artifact (if built)
+        if: needs.check-apk-changes.outputs.apk == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: game-apk
+
+      - name: Rename APK and get version
+        run: |
+          VERSION_NAME=$(cat version | cut -f1 -d-)
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          if [ -f OK.apk ]; then
+             mv OK.apk Game-v$VERSION_NAME.apk
+          fi
+
       - name: Encrypt PCK
         run: |
           KEY="${{ env.ENCRYPTION_KEY }}"
           IV="${{ env.ENCRYPTION_IV }}"
-          echo "Using encryption key: $KEY"
-          echo "Using IV: $IV"
           openssl enc -aes-256-cbc -in project.pck -out project.encrypted.pck -K $KEY -iv $IV -nosalt
+
       - name: Set up Git
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git fetch --prune --unshallow || git fetch # Fetch full history
-          git fetch --tags # Fetch all tags
+          git fetch --prune --unshallow || git fetch
+          git fetch --tags
 
       - name: Get version/tag
         id: vars
@@ -77,32 +164,25 @@ jobs:
           TAG_NAME="release-$(date +'%Y%m%d%H%M%S')"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           
-          # Get previous tag safely
           PREV_TAG=$(git tag -l | sort -V | tail -n 1 || echo "")
-          echo "Previous tag: $PREV_TAG"
-          PREV_COMMIT=$(git rev-parse ${PREV_TAG})
+          PREV_COMMIT=$(git rev-parse ${PREV_TAG} 2>/dev/null || echo "")
           LATEST_COMMIT=$(git rev-parse HEAD)
-          echo "Previous commit: $PREV_COMMIT"
-          echo "Latest commit: $LATEST_COMMIT"
-          # Create version info as JSON
+          
           echo "{
             \"release\": \"$TAG_NAME\",
             \"buildDate\": \"$(date +'%Y-%m-%d %H:%M:%S')\",
             \"branch\": \"${{ github.ref_name }}\",
             \"lastCommitMessage\": \"$(git log -1 --pretty=%B)\",
-            \"commit\": \"$(git rev-parse HEAD)\",
+            \"commit\": \"$LATEST_COMMIT\",
             \"previousTag\": \"${PREV_TAG:-initial}\"
           }" > version.json
-      - name: Generate version.diff
-        run: |
-          PREV_TAG=$(git tag -l | sort -V | tail -n 1 || echo "")
-          echo "Previous tag: $PREV_TAG"
-          PREV_COMMIT=$(git rev-parse ${PREV_TAG})
-          LATEST_COMMIT=$(git rev-parse HEAD)
-          echo "Generating diff between previous and latest commit"
-          echo "Previous commit: ${PREV_COMMIT}"
-          echo "Latest commit: ${LATEST_COMMIT}"
-          git diff --name-status ${PREV_COMMIT}..${LATEST_COMMIT} > version$(cat version).diff
+
+          if [ -n "$PREV_COMMIT" ]; then
+            git diff --name-status $PREV_COMMIT..$LATEST_COMMIT > version_$(cat version).diff
+          else
+            echo "First release" > version_$(cat version).diff
+          fi
+
       - name: Create Git tag
         run: |
           git tag ${{ steps.vars.outputs.tag_name }}
@@ -115,8 +195,9 @@ jobs:
           name: Release ${{ steps.vars.outputs.tag_name }}
           files: |
             project.encrypted.pck
+            Game-v*.apk
             version.json
-            version.diff
+            version*.diff
             version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
