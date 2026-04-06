@@ -212,7 +212,11 @@ jobs:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            🚀 *New Android Build Available!*
-            🔗 *Download Link:*
-            https://github.com/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag_name }}
-          format: markdown
+            🚀 <b>New Android Build Available!</b>
+            
+            📦 <b>Version:</b> ${{ env.VERSION_NAME }}
+            📝 <b>Commit:</b> ${{ github.event.head_commit.message }}
+            
+            🔗 <b>Download Link:</b>
+            <a href="https://github.com/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag_name }}">Click here to Download</a>
+          format: html
