@@ -219,5 +219,4 @@ jobs:
             
             🔗 *Download Link:*
             https://github.com/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag_name }}
-          document: Game-v${{ env.VERSION_NAME }}.apk
           format: markdown
