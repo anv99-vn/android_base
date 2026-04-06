@@ -217,5 +217,5 @@ jobs:
             🏷 *Tag:* `${{ steps.vars.outputs.tag_name }}`
             📦 *Version:* 
             📝 *Commit:* 
-          document: Game-Godot.apk
+          document: Game-v${{ env.VERSION_NAME }}.apk
           format: markdown
