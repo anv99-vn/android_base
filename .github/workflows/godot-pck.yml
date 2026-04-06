@@ -217,7 +217,7 @@ jobs:
             📦 *Version:* `${{ env.VERSION_NAME }}`
             📝 *Commit:* `${{ github.event.head_commit.message }}`
             
-            🔗 *Download from GitHub Release:*
+            🔗 *Download Link:*
             https://github.com/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag_name }}
           document: Game-v${{ env.VERSION_NAME }}.apk
           format: markdown
