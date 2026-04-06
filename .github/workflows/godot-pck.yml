@@ -212,10 +212,12 @@ jobs:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            🚀 *New Android Build Successful!*
+            🚀 *New Android Build Available!*
             
-            🏷 *Tag:* `${{ steps.vars.outputs.tag_name }}`
-            📦 *Version:* 
-            📝 *Commit:* 
+            📦 *Version:* `${{ env.VERSION_NAME }}`
+            📝 *Commit:* `${{ github.event.head_commit.message }}`
+            
+            🔗 *Download from GitHub Release:*
+            https://github.com/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag_name }}
           document: Game-v${{ env.VERSION_NAME }}.apk
           format: markdown
