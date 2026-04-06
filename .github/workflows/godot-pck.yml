@@ -16,6 +16,10 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-apk-changes:
     runs-on: ubuntu-latest
@@ -201,3 +205,17 @@ jobs:
             version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Telegram
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            🚀 *New Android Build Successful!*
+            
+            🏷 *Tag:* `${{ steps.vars.outputs.tag_name }}`
+            📦 *Version:* 
+            📝 *Commit:* 
+          document: Game-Godot.apk
+          format: markdown
