@@ -1,7 +1,7 @@
 name: Godot Build & Release
 
 env:
-  GODOT_VERSION: 4.6.1
+  GODOT_VERSION: 4.6.2
   ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
   ENCRYPTION_IV: ${{ secrets.ENCRYPTION_IV }}
   ANDROID_KEYSTORE_DEBUG_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
